@@ -20,25 +20,19 @@
 <li><a href="#Running Kiwix">Running Kiwix</a></li>
 <li><a href="#References">References</a></li>
 </ul>
-<h2 id="Installation">
-Installation
-</h2>
+<h2 id="Installation">Installation</h2>
 <p>As of writing, Kiwix is only available on Alpine via the testing repository (check here[0] if you're on a different distro w/o a Kiwix package). If you don't already have the testing repo then you can add it as a tagged repository[1] by adding the following line to /etc/apk/repositories (feel free to use your mirror of choice):</p>
 <pre>@testing http://mirror.leaseweb.com/alpine/edge/testing
 </pre>
 <p>This will make it possible to add packages from the testing repository by appending @testing to the package name. Now install Kiwix as root:</p>
 <pre># apk update
 # apk add kiwix-tools@testing</pre>
-<h2 id="Running as a separate user">
-Running as a separate user
-</h2>
+<h2 id="Running as a separate user">Running as a separate user</h2>
 <p>I decided I want to run Kiwix as a separate user for security:</p>
 <pre># adduser -D kiwix  # -D disables password so only root can su to kiwix 
 # su - kiwix</pre>
 <p>The rest of the commands in the post are ran as this "kiwix" user unless otherwise indicated with a preceding # sign.</p>
-<h2 id="Getting the ZIM files">
-Getting the ZIM files
-</h2>
+<h2 id="Getting the ZIM files">Getting the ZIM files</h2>
 <p>Now you need ZIM files for Kiwix to actually serve, these files contain the actual Wikipedia articles. You can find ZIM files here:</p>
 <p><a href="https://dumps.wikimedia.org/other/kiwix/zim/wikipedia/">https://dumps.wikimedia.org/other/kiwix/zim/wikipedia/</a></p>
 <p>EDIT: You can find many more ZIM files for other MediaWiki sites (including the Arch Wiki!) here:</p>
@@ -65,12 +59,8 @@ $ curl -O https://dumps.wikimedia.org/other/kiwix/zim/wikipedia/wikipedia_en_all
 -rw-r--r--    1 kiwix    kiwix      30.8M Oct  6 18:01 /home/kiwix/wikipedia_en_100_maxi_2021-09.zim
 -rw-r--r--    1 kiwix    kiwix      11.7G Oct  6 19:21 /home/kiwix/wikipedia_en_all_mini_2021-08.zim
 -rw-r--r--    1 kiwix    kiwix     443.0M Oct  6 19:22 /home/kiwix/wikipedia_en_computer_nopic_2021-09.zim</pre>
-<h2 id="Running Kiwix">
-Running Kiwix
-</h2>
-<a href="../data/workingkiwix.png">
-<img src="../data/workingkiwix.png" alt="Kiwix's homepage being displayed in qutebrowser">
-</a>
+<h2 id="Running Kiwix">Running Kiwix</h2>
+<a href="../data/workingkiwix.png"><img src="../data/workingkiwix.png" alt="Kiwix's homepage being displayed in qutebrowser"></a>
 <p>Test kiwix on the newly acquired ZIM files:</p>
 <pre>$ kiwix-serve --port=8000 /home/kiwix/*.zim
 </pre>
@@ -89,9 +79,7 @@ exec chpst -u "kiwix:$(id -Gn kiwix | tr ' ' ':')" kiwix-serve --port=8000 /home
 <pre># /etc/init.d/runitd start
 </pre>
 <p>And now hopefully you have a working Kiwix installation!</p>
-<h2 id="References">
-References
-</h2>
+<h2 id="References">References</h2>
 <p>[0] https://www.kiwix.org/en/download/</p>
 <p>[1] https://wiki.alpinelinux.org/wiki/Alpine_Linux_package_management#Repository_pinning</p>
 <p>[2] https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes</p>
