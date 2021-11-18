@@ -1,0 +1,116 @@
+Simple headless Kiwix setup for offline Wikipedia
+
+I read a lot of Wikipedia. According to my browser history I have visited 70 Wikipedia articles this week (only in qutebrowser, I have w3m and Firefox set to discard history, so the true number is probably quite a bit higher). Even the design of this blog is pretty clearly influenced by Wikipedia.
+
+There are multiple reasons one may want to access Wikipedia locally. Your internet may go down, you may plan to be in a place that doesn't have internet at all, your internet may be censored, you might not want your ISP or government knowing (when) you are accessing Wikipedia, you might not want Wikipedia themselves to know what articles you are reading, or you might just want to be *cool*.
+
+This post provides instructions for setting up Kiwix on an Alpine Linux system. Although some advice is provided for other Linux distributions, you'll need to know how to work with your package manager and your init system in order to follow along on another distro.
+
+
+============
+Installation
+============
+
+As of writing, Kiwix is only available on Alpine via the testing repository (check here[0] if you're on a different distro w/o a Kiwix package). If you don't already have the testing repo then you can add it as a tagged repository[1] by adding the following line to /etc/apk/repositories (feel free to use your mirror of choice):
+
+@testing http://mirror.leaseweb.com/alpine/edge/testing
+
+This will make it possible to add packages from the testing repository by appending @testing to the package name. Now install Kiwix as root:
+
+# apk update
+# apk add kiwix-tools@testing
+
+==========================
+Running as a separate user
+==========================
+
+I decided I want to run Kiwix as a separate user for security:
+
+# adduser -D kiwix  # -D disables password so only root can su to kiwix 
+# su - kiwix
+
+The rest of the commands in the post are ran as this "kiwix" user unless otherwise indicated with a preceding # sign.
+
+=====================
+Getting the ZIM files
+=====================
+
+Now you need ZIM files for Kiwix to actually serve, these files contain the actual Wikipedia articles. You can find ZIM files here:
+
+https://dumps.wikimedia.org/other/kiwix/zim/wikipedia/
+
+EDIT: You can find many more ZIM files for other MediaWiki sites (including the Arch Wiki!) here:
+https://download.kiwix.org/zim/
+
+To find the ZIM file(s) you want, you should understand the format of these filenames:
+
+wikipedia_<ISO639-1[2]>_<topic>_<scope>_<year>-<month>.zim
+
+The "topic" restricts the set of articles to a single topic (e.g., computer, geography, chemistry), which can be "all" for no topic restriction. The "scope" describes what parts of each article are (not) stored. The "mini" scope provides _only_ lead sections[3] of articles (usually the first 1-4 paragraphs) and the info boxes[4]. The "nopic" scope provides whole articles minus any pictures. The "maxi" scope consists of whole articles, pictures and all.
+
+As you can imagine, all of these variables greatly impact the filesize. Here's a fun one-liner to find the biggest ZIM file:
+
+$ w3m -dump https://dumps.wikimedia.org/other/kiwix/zim/wikipedia/ | 
+	tail -n +6 | head -n -2 | 
+	awk '$4 > n { n = $4; big = $0 } END { print big }'
+
+As of writing, this outputs:
+
+wikipedia_en_all_maxi_2021-03.zim                  30-Mar-2021 19:26         88082131032
+
+That's 88 gigabytes, so you will likely want to opt for something smaller. I decided I want a "mini" version of all of English Wikipedia, a "nopic" version of all computer-related English Wikipedia articles, and a "maxi" version of the top 100 Wikipedia articles. The curl command ended up looking like this:
+
+# don't run this command verbatim, get up to date links from the resources above 
+$ curl -O https://dumps.wikimedia.org/other/kiwix/zim/wikipedia/wikipedia_en_all_mini_2021-08.zim \
+	-O https://dumps.wikimedia.org/other/kiwix/zim/wikipedia/wikipedia_en_computer_nopic_2021-09.zim \
+	-O https://dumps.wikimedia.org/other/kiwix/zim/wikipedia/wikipedia_en_100_maxi_2021-09.zim
+
+After a long wait, they are done downloading:
+
+$ ls -lh /home/kiwix/*.zim
+-rw-r--r--    1 kiwix    kiwix      30.8M Oct  6 18:01 /home/kiwix/wikipedia_en_100_maxi_2021-09.zim
+-rw-r--r--    1 kiwix    kiwix      11.7G Oct  6 19:21 /home/kiwix/wikipedia_en_all_mini_2021-08.zim
+-rw-r--r--    1 kiwix    kiwix     443.0M Oct  6 19:22 /home/kiwix/wikipedia_en_computer_nopic_2021-09.zim
+
+=============
+Running Kiwix
+=============
+
+../data/workingkiwix.png Kiwix's homepage being displayed in qutebrowser
+
+Test kiwix on the newly acquired ZIM files:
+
+$ kiwix-serve --port=8000 /home/kiwix/*.zim
+
+Now open a web browser and point it to http://127.0.0.1:8000/ and you should hopefully be greeted with the Kiwix home page, with the ability to search for Wikipedia articles and read them.
+
+You'll probably want to start Kiwix as a service on boot. I like to use runit for this. On Alpine you can easily set up runit like so:
+
+# apk add runit runit-openrc
+# rc-update add runitd
+
+Now place the following script at /etc/service/kiwix/run (on other distros your service directory may be elsewhere like /var/service/):
+
+#!/bin/sh -e
+exec chpst -u "kiwix:$(id -Gn kiwix | tr ' ' ':')" kiwix-serve --port=8000 /home/kiwix/*.zim
+
+Don't forget to mark it as executable:
+
+# chmod u+x /etc/service/kiwix/run
+
+Start runit:
+
+# /etc/init.d/runitd start
+
+And now hopefully you have a working Kiwix installation!
+
+==========
+References
+==========
+
+[0] https://www.kiwix.org/en/download/
+[1] https://wiki.alpinelinux.org/wiki/Alpine_Linux_package_management#Repository_pinning
+[2] https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes
+[3] https://en.wikipedia.org/wiki/Wikipedia:Manual_of_Style/Lead_section
+[4] https://en.wikipedia.org/wiki/Help:Infobox
+

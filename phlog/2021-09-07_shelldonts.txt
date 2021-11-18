@@ -1,0 +1,262 @@
+Common and not-so-common *nix shell footguns
+
+Footguns are ranked by rarity in ascending order. Shell veterans may want to read this post section-by-section from bottom to top. This post focuses on POSIX shell, therefore most of this information will likely also apply to your preferred *nix shell (especially in "POSIX mode"), but sometimes not.
+
+Enjoy!
+
+
+======
+Quotes
+======
+
+Quotes are probably the most misunderstood thing by newcomers. The simple explanation is *always* use "double quotes" when referencing a "$variable" and also use quotes when using a space or reserved character (e.g., *, ?, ;, &, &&, ||, |, <, >, $) as part of an argument (I prefer single quotes whenever possible, but use whatever looks/works best for your program).
+
+If you don't use "double quotes" around a $variable or $(command substitution) then it can/will wordsplit and glob! This can be very nasty and it's usually not what you want (and even if it is what you want, there are often cleaner ways of achieving this, discussed below). Wordsplitting means the contents of the variable or substitution may be split into multiple arguments. Usually splits occur on spaces, tabs, and newlines. Globbing means the contents of the variable may be interpreted as globs, resulting in filenames instead of literal * or ? characters.
+
+If you want to use the output of a command as a list of arguments then consider piping it into xargs(1) or using find(1) and its -exec option for file-related tasks (keep in mind that paths may contain any character except \0 AKA the null byte). Worst case scenario you can "set -f" to disable globbing, and set the IFS to the characters you'd like to split on (default is space, tab, newline).
+
+In variable assignments it's acceptable to leave $(command substitutions) and $variables unquoted. You will often see the style of "var_copy=$var" and "var=$(cat file)" for this reason.
+
+========================
+Echo with arbitrary data
+========================
+
+Different implementations of echo can vary greatly in behavior. Implementations may or may not accept options, and may or may not interpret character sequences like \n or \t as newlines and tabs. This isn't an issue when you're working with a predetermined string, like an error message that you define, where you can guarantee that no non-standard behavior is used. But with arbitrary data, like user input or text from the web, this may lead to unexpected behavior.
+
+You can usually replace invocations of echo with printf(1), oftentimes using '%s\n' (*not* arbitrary data) as the format string (printf's first argument).
+
+For writing the contents of a variable to the standard input of a command, see the "Pipes" section.
+
+======================
+Unnecessary use of cat
+======================
+
+Cat is not for every instance of writing a file into standard input, it's most useful for con*cat*enating files together (cat file1 file2 ...). Instead, use input redirection for simply writing a single file to the standard input of a command ("somecommand < file" in place of "cat file | somecommand"). This forgoes the calling of cat and the creation of a pipe, which will make the code more terse and may slightly improve the performance of your program.
+
+A valid use of cat would be "cat file1 file2 ..." which would print the contents of file1 followed by the contents of file2. Another valid use could be "var=$(cat file)" if it would be more intuitive to use the contents of the file as a variable.
+
+========
+Bashisms
+========
+
+Bash, as well as other shells such as zsh and ksh, provide extensions to the shell language that are genuinely useful, but many simple scripts that don't take advantage of these extensions still create a dependency on a specific shell (usually bash) through the use of certain commands, options, and the shebang.
+
+For the shebang, you can simply make it #!/bin/sh (or preferably #!/bin/sh -e, see the "Error handling" section). This signifies that the script is meant to be ran by the POSIX-compliant system shell, located at /bin/sh (this is often bash, so it may continue to allow bashisms, be sure to test your script using dash, busybox ash, or some other minimalist shell).
+
+A common issue is the use of [[ in place of [ or test(1). Usages of [[ can often be simply substituted for [ but sometimes minor changes need to be made. For [[ statements that use pattern matching or regex, the case statement may be used instead (as long as the regex can be expressed as a pattern, otherwise you may want to try grep, sed, or awk). Expressions using the || or && operators should be broken into multiple [ expressions (you could substitute them with the equivalent -a and -o operators, but it's much more readable to do separate [ commands).
+
+For figuring out if an option is portable I usually look to POSIX. I use the POSIX Programmer's Manual which you can probably install as a package on your distro of choice, or view it online[0] (1p are the relevant pages). It's provided as a set of man pages with sections ending with the letter p (e.g., man 1p find) and also has pages for shell builtin commands. This goes beyond removing bashisms, you would also be removing GNUisms/BSDisms/etc. This can be a daunting task, since there are _lots_ of extensions to shells and the utilities they use, so learning to differentiate between standard features and extensions takes time, and removing their usage from scripts can be tedious or even unproductive. However the payoff for learning this is worth while, since writing portable scripts is usually easier than porting non-portable scripts to other shells or other operating systems.
+
+shellcheck(1) and checkbashisms(1) can detect some of these things automatically, but won't be able to detect everything.
+
+==============
+Error handling
+==============
+
+Many shell scripts out there utilize little to no error handling at all, so when things go bad they can go _really_ bad. This is because errors are ignored/trampled over by default.
+
+To tell the shell to exit on an error you can append an -e to the shebang (#!/bin/sh -e), or run "set -e" at the top of the script. In my opinion you should _always_ do this. From here you can handle errors with the "if" statement or with the || operator, and you can still observe exit statuses with the special $? variable. You _could_ also use the && operator to handle errors, but I don't recommend it (see the "Using a bare &&" section).
+
+================================================
+Arbitrary arguments that may start with a hyphen
+================================================
+
+Commands often take options and filenames as arguments, usually interchangeably. When you provide arbitrary filename arguments (through a variable, glob, command substitution, etc.), they may be interpreted as options if they start with hyphens. This is probably not what you want and may lead to nasty behavior.
+
+The easiest and most portable solution is to use more specific paths, either by prefixing the argument with ./ (e.g., ./*.png or ./"$f") or by using an absolute path (/home/user/Pictures/*.png).
+
+An alternative option would be to "sanitize" the filename like so: case "$file" in -*) file=./"$file" ;; esac
+
+Another solution is to use the -- argument to signal the end of options to your command, so anything after the -- can't be interpreted as an option. For example 'cp -- *.png pngs/' to copy PNG files into the directory pngs. Although this solution should be pretty portable, it's not POSIX so I prefer to avoid this.
+
+In the case of arbitrary grep expressions you can prefix each expression with the -e option.
+
+Filename arguments to awk may be interpreted as variable assignments if the argument contains any occurrences of = (thanks to Reddit user u/oh5nxo for sharing this!). If you're passing arbitrary filename arguments to awk, like through a glob, consider using input redirection, cat + pipe (for multiple files), or use a case statement to make sure the filenames don't contain any =.
+
+=====
+Globs
+=====
+
+If a glob fails, the result will be the literal glob. For instance, "for f in *.png" will set f to literally "*.png" if no file matches that glob. If a glob lacking a prefix matches a file starting with a hyphen and you pass that to a command, then it may be interpreted as an argument (see the "Arbitrary arguments that may start with a hyphen" section). If your glob matches a _lot_ of files then it may even exceed the command line limit.
+
+There are multiple ways to remedy failed globs. The most portable way is to manually check if the glob results in the literal glob, like [ "$f" = '*.png' ] (or an equivalent case statement) to go with the example from before. A more terse solution using find(1) is discussed below.
+
+For globs that might match a _lot_ of files, potentially exceeding the command line limit, you should try to use find(1). Find's -name option can glob just like a shell, and if you just want to enumerate all files in a directory then you can drop the -name option and just pass the directory instead (unlike the shell, find will show hidden files as well, you can hide them with the expression ! -path '*/.*'). Find's -exec option can be used to reliably pass the filenames to a command (side note: do not interpret the output of find unless you're prepared for paths to contain newlines, spaces, and any other character except the null byte, or if you can guarantee the files won't contain problematic characters). If you terminate the -exec statement with a + instead of a ; then it will try to fit as many filenames as possible into the command line, which is often useful. When find hits the limit it will split the filenames into multiple invocations of the command (i.e., rm file1 file2 ... file123456; rm file123457 file123458 ...).
+
+=====
+Pipes
+=====
+
+Pipes are a generally useful tool, but they are a tool that should be used carefully. The exit status of every command in a pipeline is ignored except for the last, and long pipelines can be a pain to dissect and debug later.
+
+Since the error handling of pipelines is tricky, consider storing the output of the first command in a variable and passing it to the next command via a here document, or store it in a file/FIFO (see mkfifo(1)) and use input redirection (both solutions have the added benefit of being able to reuse the data).
+
+ksh, bash, and other shells provide a pipefail option, which may be useful if you want to depend on a specific shell. This does however have the issue of not knowing which command(s) threw an error.
+
+Passing the contents of a variable to a command via standard input is a common task for shell scripts. An acceptable way to do this would be "printf '%s\n' "$var" | somecommand" but I prefer using here documents. With a here document you can write the data to the command's standard input without the need to call printf or echo, and without creating a pipe. This is a couple more lines of code, it doesn't look very pretty, but you don't run the risk of exceeding the command line limit, and it should be a little more performant.
+
+=====================
+Accidentally globbing
+=====================
+
+Consider the following command:
+
+grep ^[0-9] file
+
+The intended purpose is to search for lines starting with numbers from a file, but this can cause unexpected behavior if there are any filenames in the current directory that match that pattern (e.g., a file named ^1), since the pattern would be replaced by the filename(s).
+
+Always be sure to quote or escape glob characters, which include [, *, and ? (there may be more depending on your shell).
+
+===============
+Read without -r
+===============
+
+Consider the following code:
+
+read test <<-EOF 
+	test\\test\\ 
+	test 
+EOF 
+printf '%s\n' "$test"
+
+It should be expected that this would print the first line of the here-document literally, but instead it prints testtesttest. So there are two issues here, it discards both backslashes and it reads two lines of text instead of one. For the correct behavior the -r flag should be passed to read, which is virtually always what you want.
+
+=============
+Overusing sed
+=============
+
+Sed is a very versatile program (the index at the top of this page is generated with sed!), but sometimes it's overkill. Here are some trivial tasks that you can do without sed:
+
+Appending/prepending text to the end of a string:
+stringtext=${string}text 
+textstring=text${string}
+
+Stripping a simple prefix/suffix from a string (mnemonic: # (prefix) is before % (suffix) on the keyboard's number row, double #/% make it "greedy", matching as much as possible):
+extension=${string##*.} 
+filename_without_extension=${string%.*}
+
+Stripping characters from both ends of a string (IFS should be whatever character you want stripped from each end, in this case spaces are stripped from both ends):
+IFS=' ' read -r var <<-EOF 
+	$var 
+EOF
+
+==============
+Overusing grep
+==============
+
+Much like sed, grep is also very versatile but sometimes overkill. Many times people use grep because they think they need regex, but simple pattern matching may suffice. For example if you want to check if a string contains a phone number in a simple format you might do:
+
+case "$string" in 
+	[0-9][0-9][0-9][' '\).-][0-9][0-9][0-9][' '.-][0-9][0-9][0-9][0-9]) 
+		... 
+		;; 
+esac
+
+==================================
+Not taking care of background jobs
+==================================
+
+When your script ends, any background jobs that are still running will get orphaned, and that is usually not what you want. You almost always want to use the "wait" command in some capacity, this will block until all background jobs are finished.
+
+You also need a trap to kill your background jobs when your script gets killed. Here's a dirty solution:
+
+#!/bin/sh -e 
+trap 'trap - EXIT HUP QUIT TERM INT ABRT; kill $(ps -o pid= --ppid $$) > /dev/null 2>&1' EXIT HUP QUIT TERM INT ABRT 
+sleep 1000 & 
+wait
+
+This works, but it isn't POSIX (because of the --ppid flag to ps). You could instead rely on pkill (also not POSIX):
+
+#!/bin/sh -e 
+trap 'trap - EXIT HUP QUIT TERM INT ABRT; pkill -P $$' EXIT HUP QUIT TERM INT ABRT 
+sleep 1000 & 
+wait
+
+If you're confused why I reset the trap from within the trap, see the "Double executing traps" section.
+
+=======================================
+Making files in /tmp/ without mktemp(1)
+=======================================
+
+This is a particularly nasty one. If you write to a file with output redirection (command > file) then the shell will place the output of the command into the file, preserving the permissions/ownership of the file if it already exists. When you're working with a directory like /tmp/ that *any user on the system* can create files in, this means *any user* can create the file before you write to it, giving _them_ ownership to _your_ file.
+
+This is obviously not what you would ever want, and this is why you should always use mktemp for creating temporary files/directories, despite the fact that mktemp isn't standardized (it's portable enough, I'm not aware of any modern systems that lack mktemp). Instead of giving you a hypothetical example of this issue, here are two real world issues:
+
+https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2018-15912
+https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2014-1638
+
+In CVE-2018-15912 they actually didn't need temporary files _at all_ and ended up just using $(command substitution) instead (they also dropped the &> syntax, which was superfluous/non-portable/likely a problem, since that writes stdout+stderr and they were only interested in using stdout, so a warning printed to stderr could have caused unexpected behavior).
+
+Temporary files should be a last resort, since cleaning them up and safely creating them is a burden. Additionally, creating temporary files is likely more work for the OS than a pipe or a subshell. If you're working with sensitive data and you aren't careful to set TMPDIR to /dev/shm then that data may land on disk when it really shouldn't (/tmp is on disk for many systems).
+
+In CVE-2014-1638 they had the right-ish idea of using (the deprecated and non-portable) tempfile(1), but added suffixes to the filenames themselves, completely nullifying the purpose of using tempfile. This was resolved by using "mktemp --suffix .locales" instead (the --suffix flag isn't necessary or portable, and its behavior appears to be unused in Debian's script).
+
+=======================
+Using $@ in place of $*
+=======================
+
+$@ and $* might seem like they are the same thing on the surface level, but $@ is a special variable that wordsplits without globbing when quoted. This is useful for propagating arguments to another program or function (e.g., exec abc "$@") but this can sometimes be undesired behavior.
+
+Consider the command [ ! "$@" ]. The intent is to check if there are no arguments, but if there is more than one argument then there will probably be an error, since [ will get an unexpected argument. The correct way to do this would be [ ! "$*" ], or [ "$#" -eq 0 ].
+
+======================
+Double executing traps
+======================
+
+Consider the following trap:
+
+trap 'echo hello world' EXIT HUP QUIT TERM INT ABRT
+
+Putting this trap into a script will cause it to always print "hello world" on exit, even if the script is terminated with one of the signals enumerated above. But you'll notice if you kill the script with one of these signals (e.g., by appending "kill -INT $$" to the script) then it will print "hello world" twice. This is because the trap executes once in response to the signal, and then when the trap finishes executing it triggers EXIT, which results in one more execution of the trap.
+
+The correct solution would be to reset all of the traps from within the trap, just in case you receive another signal before the trap finishes executing:
+
+trap 'trap - EXIT HUP QUIT TERM INT ABRT; echo hello world' EXIT HUP QUIT TERM INT ABRT
+
+===============
+Using a bare &&
+===============
+
+This is fairly common to find in shell scripts and usually doesn't cause any issues. But consider the following script:
+
+#!/bin/sh -e 
+a && b 
+c
+
+If "a" throws an error then the shell will continue to "c" because && "handles" the error. But if "c" is removed like so:
+
+#!/bin/sh -e 
+a && b
+
+Then when "a" exits with an error, the script will exit with the same exit status. This means you get an error even though you _really_ shouldn't, which can be an issue if your script is invoked by another script where the exit status is important.
+
+The solution would be to run the command in an if statement instead:
+
+#!/bin/sh -e 
+if a; then 
+	b 
+fi
+
+Although this is only a problem when the && expression is the final command of the script, I avoid it all of the time because it can be especially deceptive. The final command of the script is often not the final line of the script (functions, subshells, eval), the final command can vary when your script ends in an if-statement, and commands tend to get shuffled around as the script's code evolves over time.
+
+=======================
+Contribute to this post
+=======================
+
+https://github.com/AN3223/an3223.github.io/issues
+https://github.com/AN3223/an3223.github.io/pulls
+
+========
+See also
+========
+
+https://mywiki.wooledge.org/BashPitfalls
+https://github.com/dylanaraps/pure-sh-bible
+https://github.com/dylanaraps/pure-bash-bible
+
+==========
+References
+==========
+
+[0] https://man7.org/linux/man-pages/dir_section_1.html
+

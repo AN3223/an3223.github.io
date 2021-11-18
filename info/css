@@ -1,0 +1,33 @@
+* {
+	font-family: monospace;
+	font-size: medium;
+	color: #ebdbb2;
+}
+
+a {
+	color: #d79921;
+}
+
+body {
+	background: #282828;
+}
+
+h1,h2,h3,h4,h5,h6 {
+	font-weight: bold;
+}
+
+img {
+	display: block;
+	margin: 0 auto;
+	height: 80%;
+	width: 80%;
+}
+
+pre {
+	overflow: auto;
+	background: #ebdbb2;
+	color: #282828;
+	padding: .3rem .5rem;
+	border-radius: .2rem;
+}
+

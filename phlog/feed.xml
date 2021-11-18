@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+<channel>
+<title>AN3223's Blog</title>
+<link>https://an3223.github.io/</link>
+<description>AN3223's Blog</description>
+<item>
+<title>Common and not-so-common *nix shell footguns</title>
+<author>AN3223</author>
+<link>https://an3223.github.io/phlog/2021-09-07_shelldonts.txt</link>
+<guid>2021-09-07_shelldonts-r1</guid>
+</item>
+<item>
+<title>Simple headless Kiwix setup for offline Wikipedia</title>
+<author>AN3223</author>
+<link>https://an3223.github.io/phlog/2021-10-07_kiwixsetup.txt</link>
+<guid>2021-10-07_kiwixsetup-r1</guid>
+</item>
+</channel>
+</rss>
