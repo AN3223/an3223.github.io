@@ -206,11 +206,6 @@ fi
 
 Although this is only a problem when the && expression is the final command of the script, I avoid it all of the time because it can be especially deceptive. The final command of the script is often not the final line of the script (functions, subshells, eval), the final command can vary when your script ends in an if-statement, and commands tend to get shuffled around as the script's code evolves over time.
 
-.section Contribute to this post
-
-.link https://github.com/AN3223/an3223.github.io/issues
-.link https://github.com/AN3223/an3223.github.io/pulls
-
 .section See also
 
 .link https://mywiki.wooledge.org/BashPitfalls
