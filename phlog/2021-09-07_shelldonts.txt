@@ -77,11 +77,13 @@ Filename arguments to awk may be interpreted as variable assignments if the argu
 Globs
 =====
 
-If a glob fails, the result will be the literal glob. For instance, "for f in *.png" will set f to literally "*.png" if no file matches that glob. If a glob lacking a prefix matches a file starting with a hyphen and you pass that to a command, then it may be interpreted as an argument (see the "Arbitrary arguments that may start with a hyphen" section). If your glob matches a _lot_ of files then it may even exceed the command line limit.
+If a glob fails, the result will be the literal glob. For instance, "for f in *.png" will set f to literally "*.png" if no file matches that glob. If a glob lacking a prefix matches a file starting with a hyphen and you pass that to a command, then it may be interpreted as a flag argument (see the "Arbitrary arguments that may start with a hyphen" section). If your glob matches a _lot_ of files then it may even exceed the command line limit.
 
 There are multiple ways to remedy failed globs. The most portable way is to manually check if the glob results in the literal glob, like [ "$f" = '*.png' ] (or an equivalent case statement) to go with the example from before. A more terse solution using find(1) is discussed below.
 
 For globs that might match a _lot_ of files, potentially exceeding the command line limit, you should try to use find(1). Find's -name option can glob just like a shell, and if you just want to enumerate all files in a directory then you can drop the -name option and just pass the directory instead (unlike the shell, find will show hidden files as well, you can hide them with the expression ! -path '*/.*'). Find's -exec option can be used to reliably pass the filenames to a command (side note: do not interpret the output of find unless you're prepared for paths to contain newlines, spaces, and any other character except the null byte, or if you can guarantee the files won't contain problematic characters). If you terminate the -exec statement with a + instead of a ; then it will try to fit as many filenames as possible into the command line, which is often useful. When find hits the limit it will split the filenames into multiple invocations of the command (i.e., rm file1 file2 ... file123456; rm file123457 file123458 ...).
+
+Bonus: You can neatly store the result of a glob with set(1) and access it later with "$@" (assuming you're done using your script's positional parameters since this will overwrite them), e.g., set -- ./*.jpg
 
 =====
 Pipes
